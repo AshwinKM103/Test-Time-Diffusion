@@ -38,15 +38,14 @@ The agent operates in a structured, multi-stage process orchestrated by `src/pip
 * **Generative LLM**: `Qwen/Qwen3-4B-Instruct-2507`
 * **Reranker Model**: `tomaarsen/Qwen3-Reranker-0.6B-seq-cls`
 * **Retrieval Source**: FineWeb Search API
-* **Containerization**: Docker
+* **Containerization**: Removed (Local setup only)
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-* Docker and Docker Compose
-* An NVIDIA GPU with 24GB+ VRAM
-* NVIDIA Container Toolkit
+* Conda (or Miniconda/Anaconda) package manager
+* An NVIDIA GPU with 24GB+ VRAM (for vLLM)
 
 ### 1. Configure Environment
 
@@ -61,20 +60,25 @@ Now, open `.env` and add your API keys for:
 * `FINEWEB_API_KEY`
 * `OPENROUTER_API_KEY` (used as a fallback for the generator)
 
-### 2. Build and Run the Container
+### 2. Install Dependencies and Run Locally
 
-We recommend using Docker Compose, which handles building the image and running the services as defined in `compose.yml`.
+We recommend using Conda to manage the virtual environment and install dependencies.
 
 ```bash
-docker compose up --build
+conda env create -f environment.yml
+conda activate mmu-rag
+```
+
+Then, you can run the startup script directly:
+
+```bash
+bash start.sh
 ```
 
 This command will:
 
-1. Build the Docker image from the `Dockerfile`.
-2. Start the container.
-3. Execute the `start.sh` script, which first launches the **vLLM OpenAI-compatible server** in the background to serve the Qwen models.
-4. After a brief pause to allow the models to load, it starts the **FastAPI application** on port `5053`.
+1. Launch the **vLLM OpenAI-compatible server** in the background to serve the Qwen models.
+2. After a brief pause to allow the models to load, it starts the **FastAPI application** on port `5053`.
 
 Your API is now running and accessible at `http://localhost:5053`.
 
@@ -83,8 +87,8 @@ Your API is now running and accessible at `http://localhost:5053`.
 You can verify that your service is compliant with the competition requirements using the provided `local_test.py` script.
 
 ```bash
-uv sync
-source venv/bin/activate
+conda activate mmu-rag
+
 
 # Test both the /run and /evaluate endpoints (full test)
 python local_test.py --base-url http://localhost:5053
@@ -110,32 +114,3 @@ A successful run will confirm that both endpoints are functioning correctly and 
 * **Static Evaluation**: `POST /evaluate`
   * **Input**: `{"query": "string", "iid": "string"}`
   * **Output**: A single JSON response `{"query_id": "string", "generated_response": "string"}`.
-
-## 🚢 Competition Submission
-
-The following AWS CLI commands are provided for pushing your final Docker image to the competition's ECR repository.
-
-1. **Sign in to AWS ECR**
-
-    ```bash
-    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <your-aws-account-id>.dkr.ecr.us-east-1.amazonaws.com
-    ```
-
-2. **Build the Image (if not already built)**
-    *Ensure you build for the correct platform.*
-
-    ```bash
-    docker build --platform linux/amd64 -t ttt-dr:latest .
-    ```
-
-3. **Tag the Image for ECR**
-
-    ```bash
-    docker tag ttt-dr:latest <your-aws-account-id>.dkr.ecr.us-east-1.amazonaws.com/neurips2025text/ttt-dr:latest
-    ```
-
-4. **Push the Image to ECR**
-
-    ```bash
-    docker push <your-aws-account-id>.dkr.ecr.us-east-1.amazonaws.com/neurips2025text/ttt-dr:latest
-    ```

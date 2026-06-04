@@ -1,0 +1,21 @@
+name: mmu-rag
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.12
+  - pip
+  - pip:
+      - aiohttp>=3.12.15
+      - async-generator>=1.10
+      - boto3>=1.40.44
+      - fastapi[standard]>=0.118.0
+      - flashinfer-python>=0.3.1.post1
+      - ipywidgets>=8.1.7
+      - jupyterlab>=4.4.9
+      - loguru>=0.7.3
+      - openai>=1.0.0
+      - python-dotenv>=1.1.1
+      - sse-starlette>=1.6.5
+      - uvicorn>=0.37.0
+      - vllm>=0.11.0
