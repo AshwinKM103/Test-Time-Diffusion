@@ -17,6 +17,30 @@ import asyncio
 import aiohttp
 from typing import Dict, Any, List, Optional
 
+import logging
+from src.utils.logger import CustomLogger
+
+CustomLogger.setup_root_logger(level=logging.INFO)
+CustomLogger.disable_other_loggers(level=logging.WARNING)
+logger = CustomLogger.setup_task_logger(
+    name="local_test",
+    output_dir="outputs/logs",
+    verbose=False
+)
+
+_builtin_print = print
+def print(*args, **kwargs):
+    if not args:
+        logger.info("")
+        return
+    msg = " ".join(str(a) for a in args)
+    if '❌' in msg or 'failed' in msg.lower() or 'error' in msg.lower():
+        logger.error(msg)
+    elif '⚠️' in msg:
+        logger.warning(msg)
+    else:
+        logger.info(msg)
+
 
 class RAGSystemTester:
     def __init__(self, base_url: str, timeout: int = 600):
@@ -183,56 +207,61 @@ class RAGSystemTester:
         total_count = len(validation_data)
 
         # Process all validation samples
-        for i, item in enumerate(validation_data):
-            query = item["query"]
-            iid = item["iid"]
+        progress = CustomLogger.create_custom_progress_bar(
+            color="cyan",
+            metrics=[("success", ".0f")]
+        )
+        with progress:
+            task_id = progress.add_task("[cyan]Processing validation samples...", total=total_count, success=success_count)
+            for i, item in enumerate(validation_data):
+                query = item["query"]
+                iid = item["iid"]
 
-            if i % 5 == 0 or i == total_count - 1:  # Show progress every 5 items
-                print(f"   🔄 Processing sample {i + 1}/{total_count}: {iid}")
+                try:
+                    payload = {
+                        "query": query,
+                        "iid": iid,  # Use iid as specified in static_evaluation.md
+                    }
 
-            try:
-                payload = {
-                    "query": query,
-                    "iid": iid,  # Use iid as specified in static_evaluation.md
-                }
+                    if not self.session:
+                        raise RuntimeError("HTTP session not initialized")
+                    async with self.session.post(
+                        f"{self.base_url}/evaluate",
+                        json=payload,
+                        headers={"Content-Type": "application/json"},
+                    ) as response:
+                        if response.status != 200:
+                            print(
+                                f"   ❌ Sample {i + 1} failed with status {response.status}"
+                            )
+                            error_body = await response.text()
+                            print(f"      Error: {error_body}")
+                            continue
 
-                if not self.session:
-                    raise RuntimeError("HTTP session not initialized")
-                async with self.session.post(
-                    f"{self.base_url}/evaluate",
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                ) as response:
-                    if response.status != 200:
-                        print(
-                            f"   ❌ Sample {i + 1} failed with status {response.status}"
-                        )
-                        error_body = await response.text()
-                        print(f"      Error: {error_body}")
-                        continue
+                        # Parse response
+                        result = await response.json()
 
-                    # Parse response
-                    result = await response.json()
+                        # Validate response format
+                        if "query_id" not in result or "generated_response" not in result:
+                            print(f"   ❌ Sample {i + 1} has invalid response format")
+                            continue
 
-                    # Validate response format
-                    if "query_id" not in result or "generated_response" not in result:
-                        print(f"   ❌ Sample {i + 1} has invalid response format")
-                        continue
+                        # Validate query_id matches iid
+                        if result["query_id"] != iid:
+                            print(
+                                f"   ❌ Sample {i + 1} query_id mismatch: expected {iid}, got {result['query_id']}"
+                            )
+                            continue
 
-                    # Validate query_id matches iid
-                    if result["query_id"] != iid:
-                        print(
-                            f"   ❌ Sample {i + 1} query_id mismatch: expected {iid}, got {result['query_id']}"
-                        )
-                        continue
+                        # Add to results
+                        results.append(result)
+                        success_count += 1
 
-                    # Add to results
-                    results.append(result)
-                    success_count += 1
-
-            except Exception as e:
-                print(f"   ❌ Sample {i + 1} failed with error: {e}")
-                continue
+                except Exception as e:
+                    print(f"   ❌ Sample {i + 1} failed with error: {e}")
+                    continue
+                finally:
+                    progress.update(task_id, advance=1, success=success_count)
 
         # Write results to result.jsonl file
         output_file = "result.jsonl"
