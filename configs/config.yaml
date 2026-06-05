@@ -1,0 +1,26 @@
+pipeline:
+  max_search_iterations: 20
+  num_search_query_variants: 5
+  report_num_variants: 1
+  report_evolution_steps: 1
+  n_min_before_exit: 5
+  num_variants: 1
+  evolution_steps: 1
+  search_top_k: 50
+
+llm:
+  provider: "auto" # 'auto', 'local', or 'openrouter'
+  local_model: "Qwen/Qwen3-4B-Instruct-2507"
+  local_port: 3002
+  openrouter_model: "alibaba/tongyi-deepresearch-30b-a3b:free"
+
+retrieval:
+  backend: "tavily" # 'tavily' or 'fineweb'
+  reranker_model: "tomaarsen/Qwen3-Reranker-0.6B-seq-cls"
+
+eval:
+  gaia_output_dir: "eval/results/gaia"
+  hle_output_dir: "eval/results/hle"
+  num_samples: 20
+  max_iterations: 20
+  gaia_level: null # 1, 2, or 3
